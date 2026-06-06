@@ -1,0 +1,163 @@
+@import "tailwindcss";
+
+@theme {
+  /* ── Brand base ─────────────────────────────── */
+  --color-brand-bg: #F8FAFC;
+  --color-brand-card: #FFFFFF;
+  --color-brand-text: #111827;
+  --color-brand-muted: #6B7280;
+
+  /* ── Brand accent palette ───────────────────── */
+  --color-brand-orange: #F97316;
+  --color-brand-red: #EF4444;
+  --color-brand-green: #22C55E;
+  --color-brand-purple: #8B5CF6;
+  --color-brand-pink: #EC4899;
+  --color-brand-amber: #F59E0B;
+  --color-brand-cyan: #06B6D4;
+
+  /* ── Metallic ───────────────────────────────── */
+  --color-metallic-start: #E2E8F0;
+  --color-metallic-end: #9CA3AF;
+
+  /* ── Radii ──────────────────────────────────── */
+  --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
+  --radius-3xl: 2rem;
+}
+
+@layer base {
+  body {
+    background-color: var(--color-brand-bg);
+    color: var(--color-brand-text);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+      Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  /* ── Global cursor fixes ───────────────────── */
+  button,
+  [role="button"],
+  a,
+  label[for],
+  select,
+  summary {
+    cursor: pointer;
+  }
+
+  input,
+  textarea {
+    cursor: text;
+  }
+
+  img {
+    max-width: 100%;
+    display: block;
+  }
+}
+
+@layer components {
+  /* ── Glassmorphism ──────────────────────────── */
+  .glass-card {
+    background: rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(229, 231, 235, 0.6);
+    border-radius: var(--radius-xl);
+  }
+
+  /* ── Metallic ───────────────────────────────── */
+  .metallic-gradient {
+    background: linear-gradient(
+      135deg,
+      var(--color-metallic-start),
+      var(--color-metallic-end)
+    );
+  }
+
+  /* ── Story ring gradients ───────────────────── */
+  .story-ring {
+    background: linear-gradient(
+      135deg,
+      #F97316 0%,
+      #EF4444 40%,
+      #EC4899 100%
+    );
+    padding: 2.5px;
+    border-radius: 9999px;
+  }
+
+  .story-ring-purple {
+    background: linear-gradient(
+      135deg,
+      #8B5CF6 0%,
+      #EC4899 60%,
+      #F97316 100%
+    );
+    padding: 2.5px;
+    border-radius: 9999px;
+  }
+
+  /* ── Energy gradient (cards / banners) ──────── */
+  .energy-gradient {
+    background: linear-gradient(135deg, #F97316 0%, #EF4444 100%);
+  }
+
+  .purple-gradient {
+    background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%);
+  }
+
+  .green-gradient {
+    background: linear-gradient(135deg, #22C55E 0%, #06B6D4 100%);
+  }
+
+  /* ── Scrollbar hide ─────────────────────────── */
+  .hide-scrollbar::-webkit-scrollbar { display: none; }
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  /* ── Interactive hover animations ──────────── */
+  .hover-lift {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .hover-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  }
+
+  .hover-scale {
+    transition: transform 0.15s ease;
+  }
+  .hover-scale:hover {
+    transform: scale(1.03);
+  }
+
+  /* ── Card interactive ───────────────────────── */
+  .card-interactive {
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    cursor: pointer;
+  }
+  .card-interactive:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08);
+  }
+  .card-interactive:active {
+    transform: scale(0.99);
+  }
+}
+
+@utility scrollbar-hidden {
+  &::-webkit-scrollbar {
+    display: none;
+  }
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

@@ -1,0 +1,20 @@
+@import "./theme.css";
+@import "./fonts.css";
+
+/* Any additional global utilities can go here */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  overflow-x: hidden;
+  max-width: 100%;
+  width: 100%;
+}
+
+img {
+  width: 100%;
+  height: auto;
+  object-fit: cover;
+}
