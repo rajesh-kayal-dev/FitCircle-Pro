@@ -1,120 +1,316 @@
-import React, { useState } from "react";
-import { Search as SearchIcon, Filter, Play, Clock, Flame, ChevronRight } from "lucide-react";
-import { motion } from "motion/react";
+import React, { useState, useEffect } from "react";
+import { Search as SearchIcon, X, TrendingUp, Users, Utensils, Dumbbell, Zap, PlayCircle, BookOpen } from "lucide-react";
+import { motion, AnimatePresence } from "motion/react";
+import { cn } from "./components/ui";
+import { fetchExploreSearch, fetchExploreTrending, fetchExploreTrainers, fetchExploreVideos, fetchExploreArticles } from "../api/endpoints";
+import { toast } from "sonner";
+import SearchAISummary from "./components/SearchAISummary";
 
-const filters = ["All", "Workouts", "Trainers", "Food"];
-
-const results = [
-  { id: 1, type: "Workout", title: "HIIT Blast", category: "Strength", duration: "25m", difficulty: "High", image: "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&q=80&w=400" },
-  { id: 2, type: "Trainer", title: "Dr. Pal", category: "Nutrition", duration: "N/A", difficulty: "Expert", image: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=400" },
-  { id: 3, type: "Workout", title: "Zen Yoga", category: "Flexibility", duration: "40m", difficulty: "Beginner", image: "https://images.unsplash.com/photo-1552196563-55cd4e45efb3?auto=format&fit=crop&q=80&w=400" },
-  { id: 4, type: "Food", title: "High Protein Bowl", category: "Diet", duration: "15m", difficulty: "Easy", image: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&q=80&w=400" },
+const tabs = [
+  { id: "all", label: "All", icon: TrendingUp },
+  { id: "workouts", label: "Workouts", icon: Dumbbell },
+  { id: "nutrition", label: "Nutrition", icon: Utensils },
+  { id: "trainers", label: "Trainers", icon: Users },
+  { id: "supplements", label: "Supplements", icon: Zap },
 ];
 
 export default function Search() {
-  const [activeFilter, setActiveFilter] = useState("All");
+  const [activeTab, setActiveTab] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchIntent, setSearchIntent] = useState("");
+  const [aiAnswer, setAiAnswer] = useState(null);
+  const [showAiSummary, setShowAiSummary] = useState(true);
+
+  // Default content
+  const [trending, setTrending] = useState([]);
+  const [trainers, setTrainers] = useState([]);
+  const [videos, setVideos] = useState([]);
+  const [articles, setArticles] = useState([]);
+  const [loadingDefaults, setLoadingDefaults] = useState(true);
+
+  useEffect(() => {
+    const loadDefaults = async () => {
+      try {
+        setLoadingDefaults(true);
+        const [tr, trn, vid, art] = await Promise.all([
+          fetchExploreTrending().catch(() => ({ data: { results: [] } })),
+          fetchExploreTrainers().catch(() => ({ data: { results: [] } })),
+          fetchExploreVideos().catch(() => ({ data: { results: [] } })),
+          fetchExploreArticles().catch(() => ({ data: { results: [] } }))
+        ]);
+        setTrending(tr.data?.results || []);
+        setTrainers(trn.data?.results || []);
+        setVideos(vid.data?.results || []);
+        setArticles(art.data?.results || []);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoadingDefaults(false);
+      }
+    };
+    loadDefaults();
+  }, []);
+
+  const executeSearch = async (query) => {
+    if (!query.trim()) {
+      setSearchResults([]);
+      setSearchIntent("");
+      setAiAnswer(null);
+      return;
+    }
+    
+    setIsSearching(true);
+    try {
+      const { data } = await fetchExploreSearch(query);
+      setSearchIntent(data.intent);
+      setSearchResults(data.results || []);
+      setAiAnswer({
+        hasDirectAnswer: data.hasDirectAnswer,
+        title: data.aiTitle,
+        summary: data.aiSummary
+      });
+      setShowAiSummary(true);
+    } catch (err) {
+      toast.error("Search failed");
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchQuery !== undefined) {
+        executeSearch(searchQuery);
+      }
+    }, 600); // 600ms debounce
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    executeSearch(searchQuery);
+  };
+
+  const renderArticleCard = (item) => (
+    <motion.a href={item.url} target="_blank" rel="noreferrer" whileHover={{ y: -4 }} key={item.id} className="bg-white rounded-3xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-xl transition-all group flex flex-col h-full">
+      <div className="h-40 w-full overflow-hidden bg-gray-50 relative">
+        <img src={item.image} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+        <div className="absolute top-3 left-3 bg-white/90 backdrop-blur-sm px-2.5 py-1 rounded-lg text-[10px] font-black uppercase text-brand-text">Article</div>
+      </div>
+      <div className="p-5 flex-1 flex flex-col">
+        <h4 className="font-black text-brand-text mb-2 line-clamp-2">{item.title}</h4>
+        <p className="text-sm font-medium text-brand-muted line-clamp-3 mb-4">{item.summary}</p>
+        <span className="text-brand-orange text-sm font-bold mt-auto flex items-center gap-1 group-hover:gap-2 transition-all">Read More &rarr;</span>
+      </div>
+    </motion.a>
+  );
+
+  const renderVideoCard = (item) => (
+    <motion.a href={item.url} target="_blank" rel="noreferrer" whileHover={{ y: -4 }} key={item.id} className="bg-white rounded-3xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-xl transition-all group">
+      <div className="h-40 w-full overflow-hidden bg-gray-900 relative flex items-center justify-center">
+        <img src={item.image} alt={item.title} className="w-full h-full object-cover opacity-70 group-hover:opacity-50 transition-opacity" />
+        <PlayCircle size={48} className="text-white absolute drop-shadow-md group-hover:scale-110 transition-transform" />
+      </div>
+      <div className="p-4">
+        <h4 className="font-black text-brand-text mb-1 line-clamp-2 leading-tight text-sm">{item.title}</h4>
+        <p className="text-xs font-bold text-brand-muted">{item.channel}</p>
+      </div>
+    </motion.a>
+  );
+
+  const renderFoodCard = (item) => (
+    <motion.div whileHover={{ y: -4 }} key={item.id} className="bg-white rounded-3xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-xl transition-all p-4 flex gap-4">
+      <div className="w-20 h-20 bg-gray-50 rounded-2xl overflow-hidden flex-shrink-0 p-2">
+        <img src={item.image} alt={item.name} className="w-full h-full object-contain mix-blend-multiply" />
+      </div>
+      <div className="flex-1 flex flex-col justify-center">
+        <h4 className="font-black text-brand-text text-sm mb-1 line-clamp-2">{item.title || item.name}</h4>
+        <div className="flex gap-2 text-xs font-bold text-brand-muted">
+          <span>{(item.nutrition?.calories || 0)} kcal</span>
+          <span className="text-brand-orange">{(item.nutrition?.protein || 0)}g protein</span>
+        </div>
+      </div>
+    </motion.div>
+  );
+
+  const renderWorkoutCard = (item) => (
+    <motion.div whileHover={{ y: -4 }} key={item.id} className="bg-white rounded-3xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-xl transition-all">
+      <div className="h-40 bg-gray-50 p-4">
+        <img src={item.image} alt={item.title} className="w-full h-full object-contain mix-blend-multiply" />
+      </div>
+      <div className="p-4 border-t border-gray-50">
+        <h4 className="font-black text-brand-text text-sm mb-1">{item.title}</h4>
+        <div className="flex gap-2">
+          <span className="bg-brand-orange/10 text-brand-orange text-[10px] px-2 py-1 rounded-md font-bold uppercase">{item.target}</span>
+          <span className="bg-gray-100 text-brand-muted text-[10px] px-2 py-1 rounded-md font-bold uppercase">{item.equipment}</span>
+        </div>
+      </div>
+    </motion.div>
+  );
+
+  const renderTrainerCard = (item) => (
+    <motion.a 
+      href={item.url || "#"} 
+      target="_blank" 
+      rel="noreferrer"
+      whileHover={{ y: -4 }} 
+      key={item.id} 
+      className="bg-white rounded-3xl border border-gray-100 p-5 shadow-sm hover:shadow-xl transition-all flex flex-col items-center text-center cursor-pointer block"
+    >
+      <div className="w-24 h-24 rounded-full overflow-hidden mb-4 border-4 border-brand-orange/20">
+        <img src={item.image} alt={item.title} className="w-full h-full object-cover" />
+      </div>
+      <h4 className="font-black text-brand-text text-lg">{item.title}</h4>
+      <p className="text-brand-orange text-xs font-black uppercase tracking-wider mb-2 line-clamp-1">{item.specialization}</p>
+      <span className="text-brand-muted text-sm font-bold bg-gray-50 px-3 py-1 rounded-full">{item.followers}</span>
+    </motion.a>
+  );
 
   return (
-    <div className="max-w-screen-xl mx-auto p-4 lg:p-8">
-      <div className="mb-8">
-        <h1 className="text-2xl font-black text-slate-900 mb-6">Explore</h1>
-
-        <div className="flex items-center gap-3 bg-white border border-slate-200 rounded-3xl p-3 shadow-sm mb-6 max-w-2xl">
-          <SearchIcon className="w-5 h-5 text-slate-400 ml-2" />
+    <div className="max-w-7xl mx-auto px-4 lg:px-6 py-6 pb-24">
+      {/* Search Header */}
+      <div className="mb-8 relative z-20">
+        <h1 className="text-3xl font-black text-brand-text tracking-tighter mb-6">Explore</h1>
+        
+        <form onSubmit={handleSearch} className="relative group">
+          <button type="submit" className="absolute inset-y-0 left-5 flex items-center">
+            <SearchIcon size={20} className="text-brand-muted hover:text-brand-orange group-focus-within:text-brand-orange transition-colors" />
+          </button>
           <input
             type="text"
-            placeholder="Search workouts, recipes, trainers..."
-            className="flex-1 bg-transparent border-none outline-none text-sm font-medium"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search workouts, diets, trainers, supplements..."
+            className="w-full pl-13 pr-12 py-4 bg-white border border-gray-200 rounded-2xl text-brand-text font-bold placeholder:text-brand-muted placeholder:font-medium focus:outline-none focus:border-brand-orange focus:ring-4 focus:ring-brand-orange/10 transition-all shadow-sm text-lg"
           />
-          <button className="p-2 bg-slate-100 rounded-2xl text-slate-600 hover:bg-slate-200">
-            <Filter className="w-4 h-4" />
-          </button>
-        </div>
-
-        <div className="flex overflow-x-auto gap-3 pb-2 hide-scrollbar px-1 w-full">
-          {filters.map((filter) => (
+          {searchQuery && (
             <button
-              key={filter}
-              onClick={() => setActiveFilter(filter)}
-              className={`px-6 py-2 rounded-2xl text-sm font-bold transition-all whitespace-nowrap ${activeFilter === filter
-                  ? "bg-slate-900 text-white shadow-lg shadow-slate-200"
-                  : "bg-white border border-slate-100 text-slate-500 hover:bg-slate-50"
-                }`}
+              type="button"
+              onClick={() => { setSearchQuery(""); setSearchResults([]); setSearchIntent(""); setAiAnswer(null); }}
+              className="absolute inset-y-0 right-4 flex items-center text-brand-muted hover:text-brand-text"
             >
-              {filter}
+              <X size={20} />
             </button>
-          ))}
+          )}
+        </form>
+      </div>
+
+      {/* Main Content */}
+      {searchQuery && searchResults.length > 0 ? (
+        <div className="space-y-6">
+          {aiAnswer?.hasDirectAnswer && showAiSummary && (
+            <SearchAISummary 
+              title={aiAnswer.title} 
+              summary={aiAnswer.summary} 
+              onClose={() => setShowAiSummary(false)} 
+            />
+          )}
+
+          <div className="flex items-center gap-3 mb-6 bg-brand-orange/10 p-4 rounded-2xl border border-brand-orange/20">
+            <Zap className="text-brand-orange" size={24} />
+            <div>
+              <p className="text-sm font-bold text-brand-muted">AI recognized your intent as:</p>
+              <p className="font-black text-brand-orange text-lg capitalize">{searchIntent.replace('_', ' ')}</p>
+            </div>
+          </div>
+          
+          <h2 className="text-xl font-black text-brand-text tracking-tight mb-4">Search Results</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {searchResults.map((item, index) => {
+              const key = item.id || index;
+              if (item.type === "article") return renderArticleCard({...item, id: key});
+              if (item.type === "video") return renderVideoCard({...item, id: key});
+              if (item.type === "workout") return renderWorkoutCard({...item, id: key});
+              if (item.nutrition) return renderFoodCard({...item, id: key});
+              if (item.type === "trainer") return renderTrainerCard({...item, id: key});
+              return null;
+            })}
+          </div>
         </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {results.map((item) => (
-          <motion.div
-            key={item.id}
-            initial={{ y: 20, opacity: 0 }}
-            whileInView={{ y: 0, opacity: 1 }}
-            viewport={{ once: true }}
-            whileHover={{ y: -4 }}
-            className="bg-white border border-slate-100 rounded-3xl overflow-hidden shadow-sm group cursor-pointer"
-          >
-            <div className="aspect-[16/9] w-full overflow-hidden relative">
-              <img src={item.image} alt={item.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-              <div className="absolute top-4 left-4">
-                <span className="px-3 py-1 bg-white/90 backdrop-blur-md rounded-full text-[10px] font-black uppercase tracking-wider text-slate-800">
-                  {item.type}
-                </span>
-              </div>
-              <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none" />
-            </div>
-
-            <div className="p-5">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{item.category}</span>
-                <div className="flex items-center gap-1 text-accent-orange">
-                  <Flame className="w-3 h-3" fill="currentColor" />
-                  <span className="text-[10px] font-black">{item.difficulty}</span>
-                </div>
-              </div>
-              <h3 className="text-lg font-black text-slate-900 mb-4">{item.title}</h3>
-
-              <div className="flex items-center justify-between mt-auto pt-4 border-t border-slate-50">
-                <div className="flex items-center gap-1.5 text-slate-500">
-                  <Clock className="w-4 h-4" />
-                  <span className="text-xs font-bold">{item.duration}</span>
-                </div>
-                <div className="p-2 bg-slate-50 rounded-xl text-slate-900 group-hover:bg-accent-orange group-hover:text-white transition-colors">
-                  <Play className="w-4 h-4" fill="currentColor" />
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        ))}
-      </div>
-
-      <div className="mt-12">
-        <h2 className="text-xl font-black text-slate-900 mb-6">Top Categories</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          {["Muscle Building", "Cardio", "Yoga", "Crossfit"].map((cat) => (
-            <div
-              key={cat}
-              className="relative aspect-square rounded-3xl overflow-hidden group cursor-pointer border border-slate-100 shadow-sm"
-            >
-              <div className="absolute inset-0 bg-slate-900/10 group-hover:bg-slate-900/30 transition-colors z-10" />
-              <img
-                src={`https://images.unsplash.com/photo-1541534741688-6078c6bfb5c5?auto=format&fit=crop&q=80&w=200`}
-                alt={cat}
-                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-              />
-              <div className="absolute bottom-4 left-4 z-20">
-                <p className="text-white font-black text-sm tracking-tight">{cat}</p>
-                <div className="flex items-center text-white/80 text-[10px] font-bold">
-                  Explore <ChevronRight className="w-3 h-3 ml-1" />
-                </div>
-              </div>
-            </div>
-          ))}
+      ) : isSearching ? (
+        <div className="flex flex-col items-center justify-center py-20 opacity-50">
+          <div className="w-12 h-12 border-4 border-gray-200 border-t-brand-orange rounded-full animate-spin mb-4"></div>
+          <p className="font-bold text-brand-text">AI is searching the fitness universe...</p>
         </div>
-      </div>
+      ) : (
+        <div className="space-y-12">
+          {/* Tabs - UI only, could filter defaults later */}
+          <div className="flex gap-2 overflow-x-auto pb-2 hide-scrollbar sticky top-0 bg-brand-bg/80 backdrop-blur-md z-10 py-2">
+            {tabs.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={cn(
+                  "flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm whitespace-nowrap transition-all duration-300 flex-shrink-0 border",
+                  activeTab === tab.id
+                    ? "bg-brand-text text-white border-brand-text shadow-md"
+                    : "bg-white text-brand-muted hover:text-brand-text border-gray-200 hover:border-gray-300 shadow-sm"
+                )}
+              >
+                <tab.icon size={16} />
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {loadingDefaults ? (
+            <div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-gray-200 border-t-brand-orange rounded-full animate-spin"></div></div>
+          ) : (
+            <>
+              {/* Trending */}
+              {(activeTab === "all" || activeTab === "trending") && trending.length > 0 && (
+                <section>
+                  <h2 className="text-2xl font-black text-brand-text tracking-tight mb-6 flex items-center gap-2">
+                    <TrendingUp className="text-brand-orange" /> Trending This Week
+                  </h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    {trending.map(renderArticleCard)}
+                  </div>
+                </section>
+              )}
+
+              {/* Workout Videos */}
+              {(activeTab === "all" || activeTab === "workouts") && videos.length > 0 && (
+                <section>
+                  <h2 className="text-2xl font-black text-brand-text tracking-tight mb-6 flex items-center gap-2">
+                    <PlayCircle className="text-brand-orange" /> Popular Workouts
+                  </h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                    {videos.map(renderVideoCard)}
+                  </div>
+                </section>
+              )}
+
+              {/* Trainers */}
+              {(activeTab === "all" || activeTab === "trainers") && trainers.length > 0 && (
+                <section>
+                  <h2 className="text-2xl font-black text-brand-text tracking-tight mb-6 flex items-center gap-2">
+                    <Users className="text-brand-orange" /> Popular Trainers
+                  </h2>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
+                    {trainers.map(renderTrainerCard)}
+                  </div>
+                </section>
+              )}
+
+              {/* Articles */}
+              {(activeTab === "all" || activeTab === "nutrition" || activeTab === "supplements") && articles.length > 0 && (
+                <section>
+                  <h2 className="text-2xl font-black text-brand-text tracking-tight mb-6 flex items-center gap-2">
+                    <BookOpen className="text-brand-orange" /> Fitness Science
+                  </h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {articles.map(renderArticleCard)}
+                  </div>
+                </section>
+              )}
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }

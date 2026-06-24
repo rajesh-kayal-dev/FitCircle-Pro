@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 
 import feedRoutes from "./routes/feed.routes.js";
+import exploreRoutes from "./routes/explore.routes.js";
 
 const app = express();
 
@@ -10,6 +11,7 @@ app.use(express.json());
 
 // routes
 app.use("/api/feed", feedRoutes);
+app.use("/api/explore", exploreRoutes);
 
 // test
 app.get("/", (req, res) => {

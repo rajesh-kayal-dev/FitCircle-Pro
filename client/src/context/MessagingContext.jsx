@@ -8,6 +8,7 @@ import {
   mockContacts,
   CURRENT_USER,
 } from "../api/mockMessages";
+import { sendMessageToAgent } from "../api/aiChatApi";
 
 const MessagingContext = createContext(null);
 
@@ -17,6 +18,7 @@ const initialState = {
   groups: mockGroups,
   groupMessages: mockGroupMessages,
   contacts: mockContacts,
+  typingConversations: {}, // { [conversationId]: true | false }
 };
 
 function messagingReducer(state, action) {
@@ -40,6 +42,37 @@ function messagingReducer(state, action) {
           : c
       );
       return { ...state, messages: updatedMessages, conversations: updatedConversations };
+    }
+
+    case "RECEIVE_AI_MESSAGE": {
+      const { conversationId, text, senderId, isPlan } = action;
+      const newMsg = {
+        id: `ai_${Date.now()}`,
+        senderId,
+        text,
+        timestamp: new Date(),
+        type: "text",
+        isAI: true,
+        isPlan: isPlan === true,
+      };
+      const updatedMessages = {
+        ...state.messages,
+        [conversationId]: [...(state.messages[conversationId] || []), newMsg],
+      };
+      const updatedConversations = state.conversations.map((c) =>
+        c.id === conversationId
+          ? { ...c, lastMessage: { text: isPlan ? "📄 Fitness Plan Ready — tap to download" : text.slice(0, 60) + (text.length > 60 ? "…" : ""), timestamp: new Date(), isFromMe: false }, unreadCount: 0 }
+          : c
+      );
+      return { ...state, messages: updatedMessages, conversations: updatedConversations };
+    }
+
+    case "SET_TYPING": {
+      const { conversationId, isTyping } = action;
+      return {
+        ...state,
+        typingConversations: { ...state.typingConversations, [conversationId]: isTyping },
+      };
     }
 
     case "SEND_GROUP_MESSAGE": {
@@ -116,6 +149,54 @@ export function MessagingProvider({ children }) {
     dispatch({ type: "SEND_MESSAGE", conversationId, text });
   }, []);
 
+  /**
+   * Send a message to an AI agent conversation.
+   * 1. Optimistically adds user message
+   * 2. Sets typing indicator
+   * 3. Calls Groq via chat-service
+   * 4. Dispatches AI reply
+   */
+  const sendAIMessage = useCallback(async (conversationId, text, agentId, conversationHistory) => {
+    // 1. Add user message immediately
+    dispatch({ type: "SEND_MESSAGE", conversationId, text });
+
+    // 2. Show typing indicator
+    dispatch({ type: "SET_TYPING", conversationId, isTyping: true });
+
+    try {
+      // 3. Build messages history for context
+      const messages = [
+        ...conversationHistory.map((msg) => ({
+          role: msg.senderId === CURRENT_USER_ID ? "user" : "assistant",
+          content: msg.text,
+        })),
+        { role: "user", content: text },
+      ];
+
+      const data = await sendMessageToAgent(agentId, messages);
+
+      // 4. Dispatch AI reply
+      dispatch({
+        type: "RECEIVE_AI_MESSAGE",
+        conversationId,
+        text: data.reply,
+        senderId: agentId,
+        isPlan: data.isPlan === true,
+      });
+    } catch (err) {
+      console.error("AI message failed:", err);
+      dispatch({
+        type: "RECEIVE_AI_MESSAGE",
+        conversationId,
+        text: "Sorry, I'm having trouble connecting right now. Please try again in a moment! 🙏",
+        senderId: agentId,
+      });
+    } finally {
+      // 5. Clear typing indicator
+      dispatch({ type: "SET_TYPING", conversationId, isTyping: false });
+    }
+  }, []);
+
   const sendGroupMessage = useCallback((groupId, text, senderName, senderAvatar) => {
     dispatch({ type: "SEND_GROUP_MESSAGE", groupId, text, senderName, senderAvatar });
   }, []);
@@ -128,10 +209,6 @@ export function MessagingProvider({ children }) {
     dispatch({ type: "MARK_GROUP_READ", groupId });
   }, []);
 
-  /**
-   * Gets existing conversation ID for a participant, or creates a new one.
-   * Returns the conversation ID immediately (deterministic).
-   */
   const getOrCreateConversationId = useCallback(
     (participantId) => {
       const existing = state.conversations.find((c) => c.participantId === participantId);
@@ -143,9 +220,6 @@ export function MessagingProvider({ children }) {
     [state.conversations]
   );
 
-  /**
-   * Find a contact by their handle (e.g. "@sahil_khan")
-   */
   const getContactByHandle = useCallback(
     (handle) => Object.values(state.contacts).find((c) => c.handle === handle),
     [state.contacts]
@@ -157,6 +231,7 @@ export function MessagingProvider({ children }) {
         ...state,
         totalUnread,
         sendMessage,
+        sendAIMessage,
         sendGroupMessage,
         markRead,
         markGroupRead,

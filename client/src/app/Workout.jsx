@@ -1,16 +1,11 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router";
-import { Play, Clock, Flame, Dumbbell, Zap, Waves, Brain, Filter, ChevronRight, Activity, Music } from "lucide-react";
-import { motion } from "motion/react";
+import { Play, Pause, Clock, Flame, Dumbbell, Zap, Waves, Brain, Filter, ChevronRight, Activity, Music, X, Loader2 } from "lucide-react";
+import { motion, AnimatePresence } from "motion/react";
+import { searchWorkoutVideos } from "../api/endpoints";
+import ReactPlayer from 'react-player';
 
-const workouts = [
-  { id: 1, title: "Lower Body Blast", category: "Strength", duration: "45m", level: "Int", kcal: "450", image: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=600", color: "text-accent-orange" },
-  { id: 2, title: "Cardio Shred", category: "Cardio", duration: "30m", level: "Adv", kcal: "600", image: "https://images.unsplash.com/photo-1518611012118-29fa75a28420?auto=format&fit=crop&q=80&w=600", color: "text-accent-red" },
-  { id: 3, title: "Mindful Flow", category: "Yoga", duration: "50m", level: "Beg", kcal: "200", image: "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&q=80&w=600", color: "text-accent-green" },
-  { id: 4, title: "Core Power", category: "Abs", duration: "15m", level: "All", kcal: "180", image: "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?auto=format&fit=crop&q=80&w=600", color: "text-accent-orange" },
-  { id: 5, title: "Full Body Ignite", category: "HIIT", duration: "40m", level: "Adv", kcal: "550", image: "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&q=80&w=600", color: "text-accent-red" },
-  { id: 6, title: "Strength & Conditioning", category: "Power", duration: "60m", level: "Int", kcal: "720", image: "https://images.unsplash.com/photo-1581009146145-b5ef03a7403f?auto=format&fit=crop&q=80&w=600", color: "text-accent-orange" },
-];
+// Workouts will be fetched dynamically from the API
 
 const categories = [
   { name: "Strength", icon: Dumbbell },
@@ -22,6 +17,84 @@ const categories = [
 export default function Workout() {
   const [activeTab, setActiveTab] = useState("Strength");
   const navigate = useNavigate();
+  const [workouts, setWorkouts] = useState([]);
+  const [loadingWorkouts, setLoadingWorkouts] = useState(false);
+
+  React.useEffect(() => {
+    const fetchFeed = async () => {
+      setLoadingWorkouts(true);
+      try {
+        const { data } = await searchWorkoutVideos(activeTab + " workout");
+        setWorkouts(data?.videos || []);
+      } catch (err) {
+        console.error("Failed to load workouts feed", err);
+      } finally {
+        setLoadingWorkouts(false);
+      }
+    };
+    fetchFeed();
+  }, [activeTab]);
+
+  const [selectedWorkout, setSelectedWorkout] = useState(null);
+  const [videoLoading, setVideoLoading] = useState(false);
+  const [videoData, setVideoData] = useState(null);
+
+  const [playing, setPlaying] = useState(true);
+  const [played, setPlayed] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const playerRef = React.useRef(null);
+
+  const handleProgress = (state) => {
+    setPlayed(state.played);
+    if (playerRef.current && duration === 0) {
+      const currentDuration = playerRef.current.duration;
+      if (currentDuration > 0) {
+        setDuration(currentDuration);
+      }
+    }
+  };
+  const handleDuration = (duration) => {
+    setDuration(duration);
+  };
+  const handleSeekChange = (e) => {
+    setPlayed(parseFloat(e.target.value));
+  };
+  const handleSeekMouseUp = (e) => {
+    if (playerRef.current) {
+      playerRef.current.currentTime = parseFloat(e.target.value) * duration;
+    }
+  };
+
+  const formatTime = (seconds) => {
+    const date = new Date(seconds * 1000);
+    const hh = date.getUTCHours();
+    const mm = date.getUTCMinutes();
+    const ss = date.getUTCSeconds().toString().padStart(2, '0');
+    if (hh) {
+      return `${hh}:${mm.toString().padStart(2, '0')}:${ss}`;
+    }
+    return `${mm}:${ss}`;
+  };
+
+  const handleWorkoutClick = async (workout) => {
+    setSelectedWorkout(workout);
+    setVideoLoading(true);
+    setVideoData(null);
+    try {
+      if (workout.videoId) {
+        setVideoData(workout);
+      } else {
+        const { data } = await searchWorkoutVideos(workout.title + " workout");
+        if (data && data.videos && data.videos.length > 0) {
+          setVideoData(data.videos[0]);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load video", err);
+    } finally {
+      setVideoLoading(false);
+    }
+  };
 
   return (
     <div className="max-w-screen-xl mx-auto p-4 lg:p-8">
@@ -80,32 +153,46 @@ export default function Workout() {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {workouts.map((workout) => (
-            <motion.div
-              key={workout.id}
-              initial={{ y: 20, opacity: 0 }}
-              whileInView={{ y: 0, opacity: 1 }}
-              viewport={{ once: true }}
-              whileHover={{ y: -8 }}
-              className="group bg-white rounded-3xl overflow-hidden border border-slate-100 shadow-md shadow-slate-200/50 flex flex-col"
-            >
-              <div className="aspect-[4/3] w-full overflow-hidden relative">
-                <img src={workout.image} alt={workout.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
-                <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black flex items-center gap-1 shadow-sm">
-                  <Activity className="w-3 h-3 text-accent-red" />
-                  {workout.kcal} KCAL
-                </div>
-                <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                  <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center text-slate-900 shadow-xl">
-                    <Play className="w-6 h-6 ml-1" fill="currentColor" />
+        {loadingWorkouts ? (
+          <div className="flex justify-center items-center py-12 w-full">
+            <Loader2 className="w-8 h-8 animate-spin text-accent-orange" />
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {workouts.map((workout) => (
+              <motion.div
+                key={workout.videoId || workout.id}
+                initial={{ y: 20, opacity: 0 }}
+                whileInView={{ y: 0, opacity: 1 }}
+                viewport={{ once: true }}
+                whileHover={{ y: -8 }}
+                onClick={() => handleWorkoutClick(workout)}
+                className="group bg-white rounded-3xl overflow-hidden border border-slate-100 shadow-md shadow-slate-200/50 flex flex-col cursor-pointer"
+              >
+                <div className="aspect-[4/3] w-full overflow-hidden relative bg-slate-100">
+                  <img 
+                    src={workout.thumbnail} 
+                    alt={workout.title} 
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" 
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = "https://placehold.co/600x400/1e293b/ffffff?text=Workout+Thumbnail+Unavailable";
+                    }}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent opacity-80 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <div className="w-14 h-14 bg-white/90 rounded-full flex items-center justify-center text-slate-900 shadow-xl group-hover:scale-110 transition-transform">
+                      <Play className="w-6 h-6 ml-1 group-hover:text-accent-orange transition-colors" fill="currentColor" />
+                    </div>
+                  </div>
+                  <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black flex items-center gap-1 shadow-sm">
+                    <Activity className="w-3 h-3 text-accent-red" />
+                    {workout.kcal} KCAL
                   </div>
                 </div>
-              </div>
 
               <div className="p-6 flex-1 flex flex-col">
                 <div className="flex items-center justify-between mb-3">
-                  <span className={`text-[10px] font-black uppercase tracking-widest ${workout.color}`}>{workout.category}</span>
+                  <span className={`text-[10px] font-black uppercase tracking-widest ${workout.color || 'text-accent-orange'}`}>{workout.category}</span>
                   <div className="flex items-center gap-1.5 text-slate-400">
                     <Clock className="w-4 h-4" />
                     <span className="text-xs font-bold">{workout.duration}</span>
@@ -132,9 +219,10 @@ export default function Workout() {
                   </button>
                 </div>
               </div>
-            </motion.div>
-          ))}
-        </div>
+              </motion.div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="bg-slate-900 rounded-[3rem] p-8 lg:p-12 relative overflow-hidden">
@@ -151,6 +239,89 @@ export default function Workout() {
           <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-slate-900/40 to-transparent" />
         </div>
       </div>
+
+      <AnimatePresence>
+        {selectedWorkout && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+            onClick={() => {
+              setSelectedWorkout(null);
+              setVideoData(null);
+            }}
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              className="bg-slate-900 rounded-[2rem] w-full max-w-4xl overflow-hidden shadow-2xl relative"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-5 border-b border-white/5 flex items-center justify-between bg-slate-900">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-accent-orange/20 flex items-center justify-center">
+                    <Dumbbell className="w-4 h-4 text-accent-orange" />
+                  </div>
+                  <span className="font-black text-white uppercase tracking-widest text-sm">FitCircle Workout</span>
+                </div>
+                <button
+                  onClick={() => {
+                    setSelectedWorkout(null);
+                    setVideoData(null);
+                  }}
+                  className="p-2 bg-white/5 text-white rounded-xl hover:bg-white/10 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="aspect-video w-full bg-black relative flex items-center justify-center">
+                {videoLoading ? (
+                  <div className="flex flex-col items-center justify-center text-white/70">
+                    <Loader2 className="w-8 h-8 animate-spin mb-4 text-accent-orange" />
+                    <p className="font-medium">Loading {selectedWorkout.title}...</p>
+                  </div>
+                ) : videoData ? (
+                  <iframe
+                    className="w-full h-full"
+                    src={`https://www.youtube.com/embed/${videoData.videoId}?autoplay=1&modestbranding=1&rel=0&playsinline=1&iv_load_policy=3&color=white`}
+                    title="FitCircle Workout Video"
+                    frameBorder="0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  ></iframe>
+                ) : (
+                  <div className="text-white/70 font-medium">
+                    No tutorial video found for this exercise.
+                  </div>
+                )}
+              </div>
+              <div className="p-6 md:p-8 bg-slate-900">
+                <h2 className="text-2xl md:text-3xl font-black text-white mb-3 tracking-tight">{selectedWorkout.title}</h2>
+                <div className="flex flex-wrap items-center gap-3 text-sm font-bold text-slate-400 mb-8 uppercase tracking-wider">
+                  <span>{selectedWorkout.duration}</span>
+                  <span className="text-slate-700">•</span>
+                  <span>{selectedWorkout.kcal} KCAL</span>
+                  <span className="text-slate-700">•</span>
+                  <span className={selectedWorkout.color || 'text-accent-orange'}>{selectedWorkout.level}</span>
+                </div>
+                <button 
+                  onClick={() => {
+                    alert('Workout Session Started!');
+                    setSelectedWorkout(null);
+                    setVideoData(null);
+                  }}
+                  className="w-full py-4 bg-gradient-to-r from-accent-orange to-accent-red text-white rounded-2xl font-black uppercase tracking-widest text-sm hover:shadow-xl hover:shadow-accent-orange/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                >
+                  <Play className="w-5 h-5" fill="currentColor" /> Start Workout
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

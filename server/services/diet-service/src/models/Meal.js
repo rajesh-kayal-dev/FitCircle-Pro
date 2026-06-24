@@ -2,8 +2,8 @@ import mongoose from "mongoose";
 
 const mealSchema = new mongoose.Schema(
   {
-    userId: mongoose.Schema.Types.ObjectId,
-    name: String,
+    userId: String,
+    name: { type: String, required: true },
     calories: Number,
     protein: Number,
     carbs: Number,

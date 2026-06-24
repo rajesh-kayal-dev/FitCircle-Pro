@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router";
 import { Star, ShoppingCart, Zap, ArrowLeft, ShieldCheck, Truck, RotateCcw, ChevronRight, Plus, Minus } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { products } from "../data/products";
+import { getProductById } from "../api/endpoints";
 import { cn } from "../app/components/ui";
 import { toast } from "sonner";
 import { useCart } from "../context/CartContext";
@@ -12,10 +12,12 @@ import { PaymentModal } from "./store/PaymentModal";
 import { OrderSuccessModal } from "./store/OrderSuccessModal";
 
 export default function ProductDetails() {
-  const { slug } = useParams();
+  const { slug } = useParams(); // slug is actually the barcode/id from API
   const navigate = useNavigate();
-  const product = products.find(p => p.slug === slug);
   const { addItem, totalItems } = useCart();
+
+  const [product, setProduct] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   const [selectedImage, setSelectedImage] = useState("");
   const [selectedFlavour, setSelectedFlavour] = useState("");
@@ -31,13 +33,47 @@ export default function ProductDetails() {
   const [orderId, setOrderId] = useState("");
 
   useEffect(() => {
-    if (product) {
-      setSelectedImage(product.image);
-      if (product.flavours?.length > 0) setSelectedFlavour(product.flavours[0]);
-      if (product.weights?.length > 0) setSelectedWeight(product.weights[0]);
-    }
+    const fetchProduct = async () => {
+      setLoading(true);
+      try {
+        const { data } = await getProductById(slug);
+        if (data.success && data.food) {
+          const fetchedProduct = {
+            id: data.food.id,
+            slug: data.food.id,
+            name: data.food.name,
+            brand: data.food.brand,
+            description: data.food.description,
+            image: data.food.image || "https://images.unsplash.com/photo-1594882645126-14020914d58d?auto=format&fit=crop&q=80&w=300",
+            price: Math.floor(Math.random() * 2000) + 500, // Dummy price
+            category: "Supplement",
+            rating: 4.5,
+            reviews: 128,
+            flavours: ["Unflavoured"],
+            weights: ["100g", "250g", "500g"],
+          };
+          setProduct(fetchedProduct);
+          setSelectedImage(fetchedProduct.image);
+          setSelectedFlavour(fetchedProduct.flavours[0]);
+          setSelectedWeight(fetchedProduct.weights[0]);
+        }
+      } catch (error) {
+        console.error("Failed to fetch product:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchProduct();
     window.scrollTo(0, 0);
-  }, [product]);
+  }, [slug]);
+
+  if (loading) {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center text-center px-4">
+        <h2 className="text-xl font-bold text-slate-500 animate-pulse">Loading Product...</h2>
+      </div>
+    );
+  }
 
   if (!product) {
     return (
@@ -48,9 +84,7 @@ export default function ProductDetails() {
     );
   }
 
-  const relatedProducts = products
-    .filter(p => p.category === product.category && p.id !== product.id)
-    .slice(0, 4);
+  const relatedProducts = [];
 
   const handleAddToCart = () => {
     for (let i = 0; i < quantity; i++) {

@@ -185,7 +185,7 @@ export function Login() {
     setLoading(true);
     try {
       const result = await loginWithGoogle(response.access_token);
-      
+
       if (result?.otpSent) {
         setEmail(result.email || "");
         setTimer(30);
@@ -287,6 +287,8 @@ export function Login() {
                       </>
                     )}
                   </button>
+
+                  {/* admin link removed from here; placed below Google button */}
                 </form>
 
                 {/* Divider */}
@@ -306,6 +308,17 @@ export function Login() {
                   <GoogleIcon />
                   Continue with Google
                 </button>
+
+                {/* Small admin link (placed under Google) */}
+                <div className="text-center mt-3">
+                  <button
+                    type="button"
+                    onClick={() => navigate('/admin-login')}
+                    className="text-xs text-gray-500 hover:text-gray-700 underline-offset-2 hover:underline"
+                  >
+                    Continue with admin login
+                  </button>
+                </div>
 
                 <p className="text-center text-xs text-gray-400 mt-8 leading-relaxed">
                   By continuing, you agree to our{" "}

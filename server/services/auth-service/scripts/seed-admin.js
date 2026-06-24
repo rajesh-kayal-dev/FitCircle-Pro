@@ -7,8 +7,8 @@ dotenv.config();
 const prisma = new PrismaClient();
 
 async function main() {
-  const email = "admin@fitcircle.com";
-  const password = "admin1234";
+  const email = process.env.ADMIN_EMAIL || "admin@fitcircle.com";
+  const password = process.env.ADMIN_PASSWORD || "admin1234";
   const hashedPassword = await bcrypt.hash(password, 10);
 
   console.log(`Seeding admin user: ${email}...`);

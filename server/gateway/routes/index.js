@@ -36,7 +36,9 @@ router.use("/diet", async (req, res) => {
 
     res.status(response.status).json(response.data);
   } catch (error) {
-    res.status(500).json({ message: "Gateway error ❌" });
+    res.status(error.response?.status || 500).json(
+      error.response?.data || { message: "Gateway error ❌" }
+    );
   }
 });
 
@@ -82,11 +84,55 @@ router.use("/store", async (req, res) => {
   }
 });
 
+//STORE PRODUCTS ROUTES (FatSecret search)
+router.use("/products", async (req, res) => {
+  try {
+    const url = `${process.env.STORE_SERVICE}/api/products${req.originalUrl.replace("/api/products", "")}`;
+
+    const response = await axios({
+      method: req.method,
+      url,
+      data: req.body,
+      headers: {
+        Authorization: req.headers.authorization || "",
+      },
+    });
+
+    res.status(response.status).json(response.data);
+  } catch (error) {
+    res.status(error.response?.status || 500).json(
+      error.response?.data || { message: "Gateway error ❌" }
+    );
+  }
+});
+
 
 //FEED SERVICE ROUTES
 router.use("/feed", async (req, res) => {
   try {
     const url = `${process.env.FEED_SERVICE}/api/feed${req.originalUrl.replace("/api/feed", "")}`;
+
+    const response = await axios({
+      method: req.method,
+      url,
+      data: req.body,
+      headers: {
+        Authorization: req.headers.authorization || "",
+      },
+    });
+
+    res.status(response.status).json(response.data);
+  } catch (error) {
+    res.status(error.response?.status || 500).json(
+      error.response?.data || { message: "Gateway error ❌" }
+    );
+  }
+});
+
+//EXPLORE SERVICE ROUTES (Routed to Feed Service)
+router.use("/explore", async (req, res) => {
+  try {
+    const url = `${process.env.FEED_SERVICE}/api/explore${req.originalUrl.replace("/api/explore", "")}`;
 
     const response = await axios({
       method: req.method,

@@ -14,6 +14,10 @@ export function AdminLogin() {
   const navigate = useNavigate();
   const { adminLogin, isAuthenticated, isAdmin } = useAuth();
 
+  // Read dev admin creds from client env (Vite exposes vars prefixed with VITE_)
+  const devAdminEmail = import.meta.env.VITE_ADMIN_EMAIL;
+  const devAdminPassword = import.meta.env.VITE_ADMIN_PASSWORD;
+
   /* redirect if already admin */
   useEffect(() => {
     if (isAuthenticated && isAdmin) navigate("/admin", { replace: true });
@@ -121,6 +125,32 @@ export function AdminLogin() {
               )}
             </button>
           </form>
+
+          {/* Autofill admin creds from client .env (dev-only) */}
+          {(devAdminEmail || devAdminPassword) && (
+            <div className="text-center mt-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail(devAdminEmail || "");
+                  setPassword(devAdminPassword || "");
+                }}
+                className="text-xs text-gray-500 hover:text-gray-700 underline-offset-2 hover:underline"
+              >
+                Fill admin creds from env
+              </button>
+            </div>
+          )}
+        </div>
+        {/* Continue to user login */}
+        <div className="text-center mt-4">
+          <button
+            type="button"
+            onClick={() => navigate('/login')}
+            className="text-xs text-gray-500 hover:text-gray-700 underline-offset-2 hover:underline"
+          >
+            Continue with user login
+          </button>
         </div>
 
       </motion.div>

@@ -1,4 +1,4 @@
-import { ArrowLeft, Search, Users, MessageSquare, Edit3 } from "lucide-react";
+import { ArrowLeft, Search, Users, MessageSquare, Edit3, Bot, Sparkles } from "lucide-react";
 import React, { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router";
 import { motion } from "motion/react";
@@ -57,6 +57,50 @@ function ActiveUsersStrip({ contacts, conversations, onSelect }) {
             </motion.button>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+// ── AI Coaches Strip ─────────────────────────────────────────
+const AI_AGENTS = [
+  { id: "conv_fitcoach_ai",    label: "FitCoach",    emoji: "🏋️", gradient: "from-orange-500 to-red-500" },
+  { id: "conv_weightloss_ai", label: "WeightLoss",   emoji: "🔥", gradient: "from-amber-400 to-orange-500" },
+  { id: "conv_musclegain_ai", label: "MuscleGain",   emoji: "💪", gradient: "from-purple-500 to-pink-500" },
+  { id: "conv_nutrition_ai",  label: "Nutrition",    emoji: "🥗", gradient: "from-green-500 to-teal-500" },
+  { id: "conv_workout_ai",    label: "Workouts",     emoji: "📋", gradient: "from-blue-500 to-indigo-500" },
+  { id: "conv_homeworkout_ai",label: "HomeGym",      emoji: "🏠", gradient: "from-cyan-500 to-blue-500" },
+  { id: "conv_yoga_ai",       label: "Yoga",         emoji: "🧘", gradient: "from-rose-400 to-purple-500" },
+  { id: "conv_motivation_ai", label: "Motivation",   emoji: "⚡", gradient: "from-yellow-400 to-orange-500" },
+];
+
+function AICoachesStrip({ onSelect }) {
+  return (
+    <div className="px-4 pb-3">
+      <div className="flex items-center gap-1.5 mb-3">
+        <Bot size={12} className="text-brand-orange" />
+        <p className="text-[10px] font-black text-brand-muted uppercase tracking-widest">AI Coaches</p>
+        <span className="flex items-center gap-0.5 bg-brand-orange/10 text-brand-orange text-[8px] font-black px-1.5 py-0.5 rounded-full border border-brand-orange/20">
+          <Sparkles size={7} />Powered by Groq
+        </span>
+      </div>
+      <div className="flex gap-3 overflow-x-auto hide-scrollbar pb-1">
+        {AI_AGENTS.map((agent) => (
+          <motion.button
+            key={agent.id}
+            whileTap={{ scale: 0.92 }}
+            onClick={() => onSelect(agent.id)}
+            className="flex flex-col items-center gap-1.5 min-w-[54px] focus:outline-none"
+          >
+            <div className={`relative w-13 h-13 rounded-2xl bg-gradient-to-br ${agent.gradient} flex items-center justify-center text-xl shadow-md`}
+              style={{ width: 52, height: 52 }}
+            >
+              {agent.emoji}
+              <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-brand-green rounded-full border-2 border-white animate-pulse" />
+            </div>
+            <span className="text-[9px] font-bold text-brand-muted truncate w-full text-center">{agent.label}</span>
+          </motion.button>
+        ))}
       </div>
     </div>
   );
@@ -242,6 +286,11 @@ export function MessagesScreen() {
           conversations={conversations}
           onSelect={(id) => navigate(`/messages/${id}`)}
         />
+      )}
+
+      {/* ── AI Coaches Strip ── */}
+      {!searchQuery && (
+        <AICoachesStrip onSelect={(convId) => navigate(`/messages/${convId}`)} />
       )}
 
       {/* ── Tab Pills ── */}

@@ -1,19 +1,67 @@
-import React, { useState } from "react";
-import { ShoppingCart, Star, Plus, Search, TrendingUp, Package, ShieldCheck } from "lucide-react";
-import { motion } from "motion/react";
+import React, { useState, useEffect } from "react";
+import { ShoppingCart, Star, Plus, Search, TrendingUp, Package, ShieldCheck, Loader2, Sparkles, X, Brain } from "lucide-react";
+import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../app/components/ui";
 import { toast } from "sonner";
-import { products, productCategories } from "../data/products";
+import { productCategories } from "../data/products";
 import { Link } from "react-router";
 import { useCart } from "../context/CartContext";
+import { searchProducts } from "../api/endpoints";
 import { CartDrawer } from "./store/CartDrawer";
 import { CheckoutModal } from "./store/CheckoutModal";
 import { PaymentModal } from "./store/PaymentModal";
 import { OrderSuccessModal } from "./store/OrderSuccessModal";
+import { askGemini } from "../api/endpoints";
+import ReactMarkdown from "react-markdown";
 
 export default function Products() {
   const [activeCategory, setActiveCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [apiResults, setApiResults] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [searchError, setSearchError] = useState(null);
+
+  // AI Recommender state
+  const [showRecommender, setShowRecommender] = useState(false);
+  const [recFormData, setRecFormData] = useState({ goal: "Muscle Gain", weight: "", experience: "Beginner" });
+  const [recLoading, setRecLoading] = useState(false);
+  const [recResult, setRecResult] = useState(null);
+
+  const handleRecommend = async (e) => {
+    e.preventDefault();
+    setRecLoading(true);
+    try {
+      const prompt = `Recommend 3 supplements for a person weighing ${recFormData.weight}kg with a goal of ${recFormData.goal} and ${recFormData.experience} experience. Explain why and best usage. Format in markdown.`;
+      const { data } = await askGemini(prompt); // Using the generic askGemini which uses Groq under the hood based on previous backend implementation
+      setRecResult(data.answer);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to generate recommendations");
+    } finally {
+      setRecLoading(false);
+    }
+  };
+
+  // Always fetch based on search query or active category
+  useEffect(() => {
+    const query = searchQuery.trim() || (activeCategory === "all" ? "supplements" : activeCategory);
+
+    const timer = setTimeout(async () => {
+      setLoading(true);
+      setSearchError(null);
+      try {
+        const { data } = await searchProducts(query);
+        setApiResults(data.foods || []);
+      } catch (err) {
+        setSearchError(err.response?.data?.message || err.message);
+        setApiResults(null);
+      } finally {
+        setLoading(false);
+      }
+    }, 800);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, activeCategory]);
 
   // Store flow modal state
   const [cartOpen, setCartOpen] = useState(false);
@@ -25,16 +73,12 @@ export default function Products() {
 
   const { addItem, totalItems } = useCart();
 
-  const filteredProducts = products.filter(p => {
-    const matchesCategory = activeCategory === "all" || p.category === activeCategory;
-    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesSearch;
-  });
+  const filteredProducts = apiResults || [];
 
   const handleAddToCart = (product, e) => {
     if (e) e.preventDefault();
     addItem(product);
-    toast.success(`${product.name} added to cart!`);
+    toast.success(`${product.name || product.food_name} added to cart!`);
   };
 
   const handleCheckout = () => {
@@ -90,8 +134,14 @@ export default function Products() {
             placeholder="Search products..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-14 pr-6 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-bold text-brand-text placeholder:text-gray-400 focus:outline-none focus:border-brand-orange focus:ring-4 focus:ring-brand-orange/10 transition-all shadow-sm"
+            className="w-full pl-14 pr-32 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-bold text-brand-text placeholder:text-gray-400 focus:outline-none focus:border-brand-orange focus:ring-4 focus:ring-brand-orange/10 transition-all shadow-sm"
           />
+          <button 
+            onClick={() => setShowRecommender(true)}
+            className="absolute right-2 top-2 bottom-2 bg-slate-900 text-white rounded-xl px-4 font-bold text-xs flex items-center gap-2 hover:bg-brand-orange transition-colors"
+          >
+            <Sparkles className="w-4 h-4 text-brand-orange group-hover:text-white" />
+          </button>
         </div>
 
         {/* Categories */}
@@ -112,52 +162,86 @@ export default function Products() {
           ))}
         </div>
 
-        {/* Product Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 md:gap-6">
-          {filteredProducts.map((product, index) => (
-            <motion.div
-              key={product.id}
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: index * 0.04 }}
-              className="bg-white rounded-3xl overflow-hidden border border-gray-100 hover:border-brand-orange/30 shadow-sm hover:shadow-xl transition-all duration-300 group flex flex-col"
-            >
-              <Link to={`/product/${product.slug}`} className="aspect-square relative overflow-hidden bg-gray-50 p-4 shrink-0 block">
-                <img
-                  src={product.image}
-                  alt={product.name}
-                  className="w-full h-full object-contain mix-blend-multiply group-hover:scale-110 transition-transform duration-500"
-                />
-                <span className="absolute top-3 left-3 px-2.5 py-1 bg-white/90 backdrop-blur-md rounded-lg text-[10px] font-black uppercase tracking-wider text-brand-text shadow-sm border border-gray-100">
-                  {product.tag}
-                </span>
-                {/* Floating Add Button */}
-                <button
-                  onClick={(e) => handleAddToCart(product, e)}
-                  className="absolute bottom-3 right-3 w-10 h-10 bg-white rounded-xl flex items-center justify-center text-brand-text shadow-lg opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 hover:bg-brand-orange hover:text-white border border-gray-100"
-                >
-                  <Plus size={20} />
-                </button>
-              </Link>
+        {/* Loading State */}
+        {loading && (
+          <div className="flex items-center justify-center py-20 bg-white rounded-3xl border border-dashed border-gray-200 shadow-sm">
+            <Loader2 size={32} className="animate-spin text-brand-orange" />
+          </div>
+        )}
 
-              <div className="p-4 flex-1 flex flex-col justify-between">
-                <Link to={`/product/${product.slug}`}>
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-brand-muted mb-1">{product.category}</div>
-                  <h3 className="font-black text-sm text-brand-text mb-2 leading-tight group-hover:text-brand-orange transition-colors">{product.name}</h3>
-                </Link>
-                <div className="flex items-center gap-1.5 mb-3">
-                  <Star size={13} className="fill-brand-orange text-brand-orange" />
-                  <span className="text-xs font-black text-brand-text">{product.rating}</span>
-                  <span className="text-xs font-bold text-brand-muted">({product.reviews})</span>
-                </div>
-                <div className="text-xl font-black tracking-tighter text-brand-text">₹{product.price.toLocaleString()}</div>
-              </div>
-            </motion.div>
-          ))}
-        </div>
+        {/* Search Error */}
+        {searchError && (
+          <div className="text-center py-12 bg-white rounded-3xl border border-dashed border-red-200 shadow-sm">
+            <div className="text-brand-text font-black text-xl tracking-tight mb-2">Search Unavailable</div>
+            <p className="text-brand-muted font-medium">{searchError}</p>
+          </div>
+        )}
+
+        {/* Product Grid */}
+        {!loading && !searchError && (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 md:gap-6">
+            {filteredProducts.map((product, index) => (
+              <motion.div
+                key={product.id}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: index * 0.04 }}
+                className="bg-white rounded-3xl overflow-hidden border border-gray-100 hover:border-brand-orange/30 shadow-sm hover:shadow-xl transition-all duration-300 group flex flex-col"
+              >
+                {/* API search result card */}
+                <>
+                  <Link to={`/product/${product.id}`} className="block">
+                    <div className="aspect-square relative overflow-hidden bg-gray-50 p-4 shrink-0 flex items-center justify-center">
+                      {product.image ? (
+                        <img src={product.image} alt={product.name} className="w-full h-full object-contain mix-blend-multiply" />
+                      ) : (
+                        <div className="text-center">
+                          <div className="w-16 h-16 bg-brand-orange/10 rounded-2xl flex items-center justify-center mx-auto mb-2">
+                            <Package size={28} className="text-brand-orange" />
+                          </div>
+                        </div>
+                      )}
+                      {product.brand && (
+                        <div className="absolute top-3 left-3 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-md">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-brand-muted">{product.brand}</span>
+                        </div>
+                      )}
+                      <button
+                        onClick={(e) => handleAddToCart(product, e)}
+                        className="absolute bottom-3 right-3 w-10 h-10 bg-white rounded-xl flex items-center justify-center text-brand-text shadow-lg opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 hover:bg-brand-orange hover:text-white border border-gray-100"
+                      >
+                        <Plus size={20} />
+                      </button>
+                    </div>
+                    <div className="p-4 flex-1 flex flex-col justify-between border-t border-gray-50">
+                      <h3 className="font-black text-sm text-brand-text mb-2 leading-tight line-clamp-2">{product.name}</h3>
+                      <div className="space-y-1 mb-3">
+                        {product.nutrition?.calories ? (
+                          <p className="text-xs font-bold text-brand-muted">{product.nutrition.calories} cal</p>
+                        ) : null}
+                        <div className="flex gap-2 text-[10px] font-bold text-brand-muted">
+                          {product.nutrition?.protein ? <span>P: {product.nutrition.protein}g</span> : null}
+                          {product.nutrition?.carbs ? <span>C: {product.nutrition.carbs}g</span> : null}
+                          {product.nutrition?.fat ? <span>F: {product.nutrition.fat}g</span> : null}
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between mt-auto pt-3 border-t border-gray-50">
+                        <span className="font-black text-brand-text">$29.99</span>
+                        <div className="flex items-center gap-1 text-xs font-bold text-green-500">
+                          <Star size={12} fill="currentColor" />
+                          <span>4.5</span>
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                </>
+              </motion.div>
+            ))}
+          </div>
+        )}
 
         {/* Empty State */}
-        {filteredProducts.length === 0 && (
+        {!loading && !searchError && filteredProducts.length === 0 && (
           <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-gray-200 shadow-sm">
             <div className="text-brand-text font-black text-xl tracking-tight mb-2">No Products Found</div>
             <p className="text-brand-muted font-medium">Try searching for something else</p>
