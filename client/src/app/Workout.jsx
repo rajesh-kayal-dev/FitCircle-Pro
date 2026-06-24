@@ -1,9 +1,9 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router";
-import { Play, Pause, Clock, Flame, Dumbbell, Zap, Waves, Brain, Filter, ChevronRight, Activity, Music, X, Loader2 } from "lucide-react";
+import { Play, Heart, Bookmark, Share2, Clock, Flame, Dumbbell, Zap, Waves, Brain, ChevronRight, Activity, Music, X, Loader2, Eye } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { searchWorkoutVideos } from "../api/endpoints";
-import ReactPlayer from 'react-player';
+import { toast } from "sonner";
 
 // Workouts will be fetched dynamically from the API
 
@@ -19,6 +19,44 @@ export default function Workout() {
   const navigate = useNavigate();
   const [workouts, setWorkouts] = useState([]);
   const [loadingWorkouts, setLoadingWorkouts] = useState(false);
+
+  // Per-video like/save — persisted in localStorage
+  const [likedVideos, setLikedVideos] = useState(() =>
+    new Set(JSON.parse(localStorage.getItem("likedWorkoutVideos") || "[]"))
+  );
+  const [savedVideos, setSavedVideos] = useState(() =>
+    new Set(JSON.parse(localStorage.getItem("savedWorkoutVideos") || "[]"))
+  );
+
+  const toggleLike = (videoId) => {
+    setLikedVideos(prev => {
+      const next = new Set(prev);
+      next.has(videoId) ? next.delete(videoId) : next.add(videoId);
+      localStorage.setItem("likedWorkoutVideos", JSON.stringify([...next]));
+      return next;
+    });
+  };
+
+  const toggleSave = (videoId) => {
+    setSavedVideos(prev => {
+      const next = new Set(prev);
+      const wasSaved = next.has(videoId);
+      wasSaved ? next.delete(videoId) : next.add(videoId);
+      localStorage.setItem("savedWorkoutVideos", JSON.stringify([...next]));
+      toast(wasSaved ? "Removed from saved" : "Saved to your workouts");
+      return next;
+    });
+  };
+
+  const handleShare = (workout) => {
+    const url = `https://www.youtube.com/watch?v=${workout.videoId}`;
+    if (navigator.share) {
+      navigator.share({ title: workout.title, url }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(url);
+      toast("Link copied to clipboard");
+    }
+  };
 
   React.useEffect(() => {
     const fetchFeed = async () => {
@@ -39,44 +77,9 @@ export default function Workout() {
   const [videoLoading, setVideoLoading] = useState(false);
   const [videoData, setVideoData] = useState(null);
 
-  const [playing, setPlaying] = useState(true);
-  const [played, setPlayed] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const playerRef = React.useRef(null);
-
-  const handleProgress = (state) => {
-    setPlayed(state.played);
-    if (playerRef.current && duration === 0) {
-      const currentDuration = playerRef.current.duration;
-      if (currentDuration > 0) {
-        setDuration(currentDuration);
-      }
-    }
-  };
-  const handleDuration = (duration) => {
-    setDuration(duration);
-  };
-  const handleSeekChange = (e) => {
-    setPlayed(parseFloat(e.target.value));
-  };
-  const handleSeekMouseUp = (e) => {
-    if (playerRef.current) {
-      playerRef.current.currentTime = parseFloat(e.target.value) * duration;
-    }
-  };
-
-  const formatTime = (seconds) => {
-    const date = new Date(seconds * 1000);
-    const hh = date.getUTCHours();
-    const mm = date.getUTCMinutes();
-    const ss = date.getUTCSeconds().toString().padStart(2, '0');
-    if (hh) {
-      return `${hh}:${mm.toString().padStart(2, '0')}:${ss}`;
-    }
-    return `${mm}:${ss}`;
-  };
 
   const handleWorkoutClick = async (workout) => {
+
     setSelectedWorkout(workout);
     setVideoLoading(true);
     setVideoData(null);
@@ -170,13 +173,17 @@ export default function Workout() {
                 className="group bg-white rounded-3xl overflow-hidden border border-slate-100 shadow-md shadow-slate-200/50 flex flex-col cursor-pointer"
               >
                 <div className="aspect-[4/3] w-full overflow-hidden relative bg-slate-100">
-                  <img 
-                    src={workout.thumbnail} 
-                    alt={workout.title} 
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" 
+                  <img
+                    src={workout.thumbnail || `https://img.youtube.com/vi/${workout.videoId}/hqdefault.jpg`}
+                    alt={workout.title}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                     onError={(e) => {
-                      e.target.onerror = null;
-                      e.target.src = "https://placehold.co/600x400/1e293b/ffffff?text=Workout+Thumbnail+Unavailable";
+                      if (!e.target.src.includes("hqdefault")) {
+                        e.target.src = `https://img.youtube.com/vi/${workout.videoId}/hqdefault.jpg`;
+                      } else {
+                        e.target.onerror = null;
+                        e.target.src = "https://placehold.co/600x400/1e293b/ffffff?text=Workout";
+                      }
                     }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent opacity-80 group-hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -184,7 +191,16 @@ export default function Workout() {
                       <Play className="w-6 h-6 ml-1 group-hover:text-accent-orange transition-colors" fill="currentColor" />
                     </div>
                   </div>
-                  <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black flex items-center gap-1 shadow-sm">
+                  {/* Like button on card */}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); toggleLike(workout.videoId); }}
+                    className="absolute top-3 left-3 p-2 bg-black/40 backdrop-blur-sm rounded-full transition-all hover:bg-black/60"
+                  >
+                    <Heart
+                      className={`w-4 h-4 transition-colors ${likedVideos.has(workout.videoId) ? "text-red-400 fill-red-400" : "text-white"}`}
+                    />
+                  </button>
+                  <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black flex items-center gap-1 shadow-sm">
                     <Activity className="w-3 h-3 text-accent-red" />
                     {workout.kcal} KCAL
                   </div>
@@ -298,25 +314,65 @@ export default function Workout() {
                   </div>
                 )}
               </div>
-              <div className="p-6 md:p-8 bg-slate-900">
-                <h2 className="text-2xl md:text-3xl font-black text-white mb-3 tracking-tight">{selectedWorkout.title}</h2>
-                <div className="flex flex-wrap items-center gap-3 text-sm font-bold text-slate-400 mb-8 uppercase tracking-wider">
-                  <span>{selectedWorkout.duration}</span>
+              <div className="p-5 md:p-7 bg-slate-900">
+                <h2 className="text-xl md:text-2xl font-black text-white mb-2 tracking-tight">{selectedWorkout.title}</h2>
+                <div className="flex flex-wrap items-center gap-3 text-xs font-bold text-slate-400 mb-5 uppercase tracking-wider">
+                  <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" />{selectedWorkout.duration}</span>
                   <span className="text-slate-700">•</span>
-                  <span>{selectedWorkout.kcal} KCAL</span>
-                  <span className="text-slate-700">•</span>
-                  <span className={selectedWorkout.color || 'text-accent-orange'}>{selectedWorkout.level}</span>
+                  <span className="flex items-center gap-1"><Flame className="w-3.5 h-3.5 text-accent-orange" />{selectedWorkout.kcal} KCAL</span>
+                  {selectedWorkout.viewCount > 0 && (
+                    <>
+                      <span className="text-slate-700">•</span>
+                      <span className="flex items-center gap-1"><Eye className="w-3.5 h-3.5" />{(selectedWorkout.viewCount / 1000).toFixed(0)}K views</span>
+                    </>
+                  )}
                 </div>
-                <button 
-                  onClick={() => {
-                    alert('Workout Session Started!');
-                    setSelectedWorkout(null);
-                    setVideoData(null);
-                  }}
-                  className="w-full py-4 bg-gradient-to-r from-accent-orange to-accent-red text-white rounded-2xl font-black uppercase tracking-widest text-sm hover:shadow-xl hover:shadow-accent-orange/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+
+                {/* Action bar: Like / Save / Share */}
+                <div className="flex items-center gap-3 mb-5">
+                  <motion.button
+                    whileTap={{ scale: 0.85 }}
+                    onClick={() => toggleLike(selectedWorkout.videoId)}
+                    className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all ${
+                      likedVideos.has(selectedWorkout.videoId)
+                        ? "bg-red-500/20 text-red-400 border border-red-500/30"
+                        : "bg-white/5 text-slate-400 border border-white/10 hover:bg-white/10"
+                    }`}
+                  >
+                    <Heart className={`w-4 h-4 ${likedVideos.has(selectedWorkout.videoId) ? "fill-red-400" : ""}`} />
+                    {likedVideos.has(selectedWorkout.videoId) ? "Liked" : "Like"}
+                  </motion.button>
+
+                  <motion.button
+                    whileTap={{ scale: 0.85 }}
+                    onClick={() => toggleSave(selectedWorkout.videoId)}
+                    className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all ${
+                      savedVideos.has(selectedWorkout.videoId)
+                        ? "bg-accent-orange/20 text-accent-orange border border-accent-orange/30"
+                        : "bg-white/5 text-slate-400 border border-white/10 hover:bg-white/10"
+                    }`}
+                  >
+                    <Bookmark className={`w-4 h-4 ${savedVideos.has(selectedWorkout.videoId) ? "fill-accent-orange" : ""}`} />
+                    {savedVideos.has(selectedWorkout.videoId) ? "Saved" : "Save"}
+                  </motion.button>
+
+                  <motion.button
+                    whileTap={{ scale: 0.85 }}
+                    onClick={() => handleShare(selectedWorkout)}
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm bg-white/5 text-slate-400 border border-white/10 hover:bg-white/10 transition-all"
+                  >
+                    <Share2 className="w-4 h-4" /> Share
+                  </motion.button>
+                </div>
+
+                <a
+                  href={`https://www.youtube.com/watch?v=${selectedWorkout.videoId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-3.5 bg-gradient-to-r from-accent-orange to-accent-red text-white rounded-2xl font-black uppercase tracking-widest text-sm hover:shadow-xl hover:shadow-accent-orange/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
                 >
-                  <Play className="w-5 h-5" fill="currentColor" /> Start Workout
-                </button>
+                  <Play className="w-5 h-5" fill="currentColor" /> Open on YouTube
+                </a>
               </div>
             </motion.div>
           </motion.div>

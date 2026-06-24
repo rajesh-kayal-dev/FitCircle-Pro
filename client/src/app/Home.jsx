@@ -81,6 +81,22 @@ export default function Home() {
   } = useInfiniteQuery({
     queryKey: ['discoverFeed', activeTab],
     queryFn: async ({ pageParam = '' }) => {
+      if (activeTab === "Saved") {
+        const pageNum = pageParam ? parseInt(pageParam) : 1;
+        const res = await API.get(`/feed/posts/saved?page=${pageNum}&limit=20`);
+        // Remap saved posts to the same shape as discover posts
+        const posts = (res.data.posts || []).map(p => ({
+          ...p,
+          _id: p._id,
+          upvotes: 0,
+          comments: 0,
+          liked: true,
+          saved: true,
+          source: p.source || "Tavily",
+          author: { name: "Saved Post", avatar: "https://ui-avatars.com/api/?name=Saved&background=f97316&color=fff" },
+        }));
+        return { posts, after: res.data.page < res.data.totalPages ? String(res.data.page + 1) : null };
+      }
       const categoryParam = activeTab === "All" ? "" : activeTab;
       const res = await API.get(`/feed/reddit?category=${categoryParam}&after=${pageParam}`);
       return res.data;
@@ -95,6 +111,7 @@ export default function Home() {
   const discoverPosts = feedData?.pages.flatMap((page, pageIdx) =>
     (page.posts || []).map((post, postIdx) => ({ ...post, _uid: `${pageIdx}-${postIdx}-${post._id || post.id}` }))
   ) || [];
+
 
   useEffect(() => {
     if (!feedData?.pages) return;
@@ -296,6 +313,7 @@ export default function Home() {
       await API.post(`/feed/posts/${post._id || post.id}/share`);
     } catch {}
   };
+
 
   const copyShareLink = async () => {
     if (!shareModalPost) return;
@@ -600,11 +618,11 @@ export default function Home() {
             <p className="text-brand-muted text-xs lg:text-base font-medium">Trending fitness articles, videos, and routines</p>
           </div>
           <div className="flex gap-1.5 p-1.5 bg-gray-100 rounded-[1.2rem] shadow-inner w-fit overflow-x-auto hide-scrollbar">
-            {["All", "Fitness", "Nutrition", "Weight Loss", "Muscle Gain"].map(tab => (
+            {["All", "Fitness", "Nutrition", "Weight Loss", "Muscle Gain", "Saved"].map(tab => (
               <button key={tab} onClick={() => setActiveTab(tab)}
                 className={`px-6 py-2.5 text-[10px] lg:text-xs font-black rounded-xl transition-all uppercase tracking-widest whitespace-nowrap ${activeTab === tab ? "bg-white text-brand-text shadow-sm border border-gray-200" : "text-brand-muted hover:text-brand-text"}`}
               >
-                {tab}
+                {tab === "Saved" ? "🔖 " + tab : tab}
               </button>
             ))}
           </div>

@@ -180,3 +180,53 @@ export async function generateHumanExplanation(foodData) {
     return "";
   }
 }
+
+/**
+ * Rerank food results by relevance to a query using Groq LLM.
+ * Used when OpenFoodFacts confidence score is low (< 60).
+ *
+ * @param {string} query - Original user search query (e.g. "Paneer Tikka")
+ * @param {string[]} foodNames - Array of candidate food names from OpenFoodFacts
+ * @returns {{ bestMatch: string|null, related: string[] }}
+ */
+export async function rerankFoodResults(query, foodNames) {
+  if (!foodNames || foodNames.length === 0) {
+    return { bestMatch: null, related: [] };
+  }
+
+  try {
+    const response = await getGroq().chat.completions.create({
+      model: "llama-3.3-70b-versatile",
+      messages: [
+        {
+          role: "system",
+          content: `You are a food search relevance expert. Given a user's search query and a list of food names from a database, rank them by relevance.
+
+Return a JSON object with:
+- "bestMatch": the single most relevant food name from the list (or null if none are relevant)
+- "related": array of up to 4 other relevant food names from the list, ordered by relevance
+
+Only use names from the provided list. If none are relevant to the query, return null for bestMatch and empty array for related.
+Respond with JSON only.`,
+        },
+        {
+          role: "user",
+          content: JSON.stringify({ query, candidates: foodNames }),
+        },
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.1,
+      max_tokens: 200,
+    });
+
+    const result = JSON.parse(response.choices[0]?.message?.content || "{}");
+    return {
+      bestMatch: result.bestMatch || null,
+      related:   Array.isArray(result.related) ? result.related.slice(0, 4) : [],
+    };
+  } catch (error) {
+    console.error("Groq rerank error:", error.message);
+    return { bestMatch: null, related: [] };
+  }
+}
+

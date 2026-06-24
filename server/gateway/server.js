@@ -6,8 +6,14 @@ import routes from "./routes/index.js";
 
 const app = express();
 
+const allowedOrigins = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    ...(process.env.CLIENT_URL ? [process.env.CLIENT_URL] : []),
+];
+
 app.use(cors({
-    origin: ["http://localhost:5173", "http://localhost:3000"],
+    origin: allowedOrigins,
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"]
@@ -26,6 +32,15 @@ app.use("/api", routes);
 
 app.get('/', (req, res) => {
     res.send('API Gateway is running');
+});
+
+// Health check endpoint — used by Docker and monitoring
+app.get('/health', (req, res) => {
+    res.status(200).json({
+        status: 'ok',
+        service: 'fitcircle-gateway',
+        timestamp: new Date().toISOString(),
+    });
 });
 
 const PORT = process.env.PORT ;
