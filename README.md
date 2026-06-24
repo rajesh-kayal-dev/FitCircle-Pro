@@ -232,9 +232,9 @@ graph TB
     %% Legend
     linkStyle 0,1,2,3,4 stroke-width:2px,stroke:#2563eb
     linkStyle 5,6,7,8,9,10,11 stroke-width:2px,stroke:#2563eb
-    linkStyle 12,13,14,15,16,17,18,19 stroke-width:1px,stroke:#16a34a
-    linkStyle 20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39 stroke-width:1px,stroke:#9333ea
-    linkStyle 40,41,42 stroke-width:1px,stroke:#dc2626,stroke-dasharray:5 5
+    linkStyle 12,13,14,15,16,17,18 stroke-width:1px,stroke:#16a34a
+    linkStyle 19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36 stroke-width:1px,stroke:#9333ea
+    linkStyle 37,38,39 stroke-width:1px,stroke:#dc2626,stroke-dasharray:5 5
 ```
 
 ---
