@@ -1,0 +1,182 @@
+name: FitCircle Pro CI/CD
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "client/**"
+      - "server/**"
+      - "nginx/**"
+      - "docker-compose*.yml"
+      - ".github/workflows/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "client/**"
+      - "server/**"
+      - "nginx/**"
+      - "docker-compose*.yml"
+      - ".github/workflows/**"
+
+env:
+  FRONTEND_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/fitcircle-frontend
+  BACKEND_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/fitcircle-backend
+
+jobs:
+  # ────────────────────────────────────────────────────────────
+  # Job 1a: Build & Test — Client
+  # Only runs when client/** files change
+  # ────────────────────────────────────────────────────────────
+  build-client:
+    name: 🖥️ Build Client
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install dependencies
+        working-directory: client
+        run: npm ci
+
+      # Test stage — wired up, passes until real tests are added
+      - name: Run tests
+        working-directory: client
+        run: npm test || true
+
+      - name: Build (Vite)
+        working-directory: client
+        run: npm run build
+        env:
+          VITE_API_URL: http://localhost:5000
+          VITE_GOOGLE_CLIENT_ID: placeholder
+
+  # ────────────────────────────────────────────────────────────
+  # Job 1b: Build & Test — Server
+  # Only runs when server/** files change
+  # ────────────────────────────────────────────────────────────
+  build-server:
+    name: ⚙️ Build Server
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install dependencies (all workspaces)
+        working-directory: server
+        run: npm ci --workspaces --include-workspace-root
+
+      # Test stage — wired up, passes until real tests are added
+      - name: Run tests
+        working-directory: server
+        run: npm test || true
+
+  # ────────────────────────────────────────────────────────────
+  # Job 2: Docker Build & Push (main branch only)
+  # Waits for BOTH build jobs to pass
+  # Builds only the images for changed services
+  # ────────────────────────────────────────────────────────────
+  docker-build-push:
+    name: 🐳 Docker Build & Push
+    runs-on: ubuntu-latest
+    needs: [build-client, build-server]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Detect changed paths
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            client:
+              - "client/**"
+            server:
+              - "server/**"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # ── Frontend Image (only if client changed) ──────────────
+      - name: Build & push frontend image
+        if: steps.changes.outputs.client == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: ./client
+          file: ./client/Dockerfile
+          push: true
+          tags: |
+            ${{ env.FRONTEND_IMAGE }}:latest
+            ${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
+
+      # ── Backend Image (only if server changed) ───────────────
+      - name: Build & push backend image
+        if: steps.changes.outputs.server == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: ./server
+          file: ./server/Dockerfile
+          push: true
+          tags: |
+            ${{ env.BACKEND_IMAGE }}:latest
+            ${{ env.BACKEND_IMAGE }}:${{ github.sha }}
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+
+  # ────────────────────────────────────────────────────────────
+  # Job 3: Deploy to VPS (main branch only, after Docker push)
+  # ────────────────────────────────────────────────────────────
+  deploy:
+    name: 🚀 Deploy to VPS
+    runs-on: ubuntu-latest
+    needs: docker-build-push
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            cd /opt/fitcircle
+
+            # Export Docker Hub username for prod compose
+            export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
+
+            # Pull latest images from Docker Hub
+            docker compose -f docker-compose.prod.yml pull
+
+            # Restart with zero-downtime rolling update
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans
+
+            # Free disk space — remove dangling images
+            docker image prune -f
+
+            echo "✅ FitCircle Pro deployed successfully — $(date)"

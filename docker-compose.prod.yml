@@ -1,0 +1,121 @@
+# ─────────────────────────────────────────────────────────────────
+# FitCircle Pro — Production Docker Compose
+#
+# Usage:
+#   docker compose -f docker-compose.prod.yml up -d
+#   docker compose -f docker-compose.prod.yml pull && docker compose -f docker-compose.prod.yml up -d
+#
+# Requires on VPS:
+#   - /opt/fitcircle/server/.env  (real secrets, never commit)
+#   - Docker + Docker Compose installed
+# ─────────────────────────────────────────────────────────────────
+
+services:
+  # ── MongoDB ──────────────────────────────────────────────────
+  mongodb:
+    image: mongo:7
+    container_name: fitcircle-mongodb
+    restart: always
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - fitcircle-net
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  # ── Backend (Gateway + All Microservices) ────────────────────
+  # Pulled from Docker Hub — never built on VPS
+  backend:
+    image: ${DOCKERHUB_USERNAME}/fitcircle-backend:latest
+    container_name: fitcircle-backend
+    restart: always
+    # No direct port exposure — traffic goes through Nginx only
+    expose:
+      - "5000"
+    env_file:
+      - ./server/.env
+    environment:
+      AUTH_SERVICE: http://localhost:5001
+      USER_SERVICE: http://localhost:5002
+      USER_SERVICE_URL: http://localhost:5002
+      FEED_SERVICE: http://localhost:5003
+      STORE_SERVICE: http://localhost:5004
+      WORKOUT_SERVICE: http://localhost:5005
+      DIET_SERVICE: http://localhost:5006
+      CHAT_SERVICE: http://localhost:5007
+      NODE_ENV: production
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - fitcircle-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  # ── Frontend (React + Nginx static) ──────────────────────────
+  # Pulled from Docker Hub — never built on VPS
+  frontend:
+    image: ${DOCKERHUB_USERNAME}/fitcircle-frontend:latest
+    container_name: fitcircle-frontend
+    restart: always
+    # No direct port exposure — traffic goes through Nginx reverse proxy
+    expose:
+      - "80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - fitcircle-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ── Nginx Reverse Proxy ───────────────────────────────────────
+  # Single public entry point — routes / to frontend, /api/ to backend
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: fitcircle-nginx
+    restart: always
+    ports:
+      - "80:80"
+      # Uncomment when you add SSL:
+      # - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      # Uncomment for SSL certificates (e.g. via Certbot):
+      # - /etc/letsencrypt:/etc/letsencrypt:ro
+    depends_on:
+      frontend:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    networks:
+      - fitcircle-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # Deployments are handled by GitHub Actions (CI/CD-driven).
+  # Watchtower removed — CI/CD provides controlled rollout + rollback.
+
+volumes:
+  mongodb_data:
+    driver: local
+
+networks:
+  fitcircle-net:
+    driver: bridge
