@@ -43,11 +43,13 @@ ENV NODE_ENV=production
 # Copy everything from builder (source + node_modules)
 COPY --from=builder /app ./
 
+# Set port to 7860 for Hugging Face Spaces
+ENV PORT=7860
 # Expose gateway port
-EXPOSE 5000
+EXPOSE 7860
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-    CMD wget -qO- http://localhost:5000/health || exit 1
+    CMD wget -qO- http://localhost:7860/health || exit 1
 
 # Start all services via concurrently (defined in root package.json)
 CMD ["npm", "start"]
