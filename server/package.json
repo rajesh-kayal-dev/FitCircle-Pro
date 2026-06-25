@@ -11,7 +11,7 @@
     "dev": "concurrently --kill-others-on-fail --prefix \"[{name}]\" --names \"gateway,auth,user,diet,workout,feed,store,chat\" --prefix-colors \"cyan,green,yellow,magenta,blue,red,white,gray\" \"npm run dev --prefix gateway\" \"npm run dev --prefix services/auth-service\" \"npm run dev --prefix services/user-service\" \"npm run dev --prefix services/diet-service\" \"npm run dev --prefix services/workout-service\" \"npm run dev --prefix services/feed-service\" \"npm run dev --prefix services/store-service\" \"npm run dev --prefix services/chat-service\"",
     "start": "concurrently --kill-others-on-fail --prefix \"[{name}]\" --names \"gateway,auth,user,diet,workout,feed,store,chat\" --prefix-colors \"cyan,green,yellow,magenta,blue,red,white,gray\" \"npm start --prefix gateway\" \"npm start --prefix services/auth-service\" \"npm start --prefix services/user-service\" \"npm start --prefix services/diet-service\" \"npm start --prefix services/workout-service\" \"npm start --prefix services/feed-service\" \"npm start --prefix services/store-service\" \"npm start --prefix services/chat-service\""
   },
-  "devDependencies": {
+  "dependencies": {
     "concurrently": "^9.1.2"
   }
 }
