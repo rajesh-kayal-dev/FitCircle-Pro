@@ -44,7 +44,7 @@ app.get('/health', (req, res) => {
     });
 });
 
-const PORT = process.env.PORT ;
+const PORT = process.env.PORT || 7860;
 
 app.listen(PORT, () => {
     console.log(`API Gateway is running on port ${PORT}`);

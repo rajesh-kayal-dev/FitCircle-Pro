@@ -45,8 +45,7 @@ ENV NODE_ENV=production
 # Copy everything from builder (source + node_modules)
 COPY --from=builder /app ./
 
-# Set port to 7860 for Hugging Face Spaces
-ENV PORT=7860
+# Do not set global PORT here, it causes EADDRINUSE across services
 # Expose gateway port
 EXPOSE 7860
 
