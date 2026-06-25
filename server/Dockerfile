@@ -39,6 +39,9 @@ FROM node:22-alpine AS runner
 
 WORKDIR /app
 
+# Install openssl required by Prisma query engine in production
+RUN apk add --no-cache openssl
+
 # Set production mode
 ENV NODE_ENV=production
 
