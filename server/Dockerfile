@@ -5,8 +5,8 @@ FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-# Install OS deps needed by some npm packages (e.g. bcrypt, canvas)
-RUN apk add --no-cache python3 make g++
+# Install OS deps needed by some npm packages (e.g. bcrypt, canvas) and openssl for Prisma
+RUN apk add --no-cache python3 make g++ openssl
 
 # Copy root workspace manifest
 COPY package.json package-lock.json ./
@@ -21,14 +21,16 @@ COPY services/store-service/package.json   ./services/store-service/
 COPY services/user-service/package.json    ./services/user-service/
 COPY services/workout-service/package.json ./services/workout-service/
 
+# Copy Prisma schemas so postinstall can generate them during npm ci
+COPY services/auth-service/prisma/ ./services/auth-service/prisma/
+COPY services/store-service/prisma/ ./services/store-service/prisma/
+COPY services/user-service/prisma/ ./services/user-service/prisma/
+
 # Install all workspace dependencies
 RUN npm ci --workspaces --include-workspace-root
 
 # Copy all source code
 COPY . .
-
-# Generate Prisma client (required by auth-service)
-RUN cd services/auth-service && npx prisma generate
 
 # ─────────────────────────────────────────────────────────
 # Stage 2: Production runner
