@@ -8,7 +8,12 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
-  server:{forwardConsole: true},
+  server: {
+    forwardConsole: true,
+    headers: {
+      "Cross-Origin-Opener-Policy": "same-origin-allow-popups"
+    }
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
