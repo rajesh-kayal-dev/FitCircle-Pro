@@ -33,34 +33,24 @@ export const sendOtp = async (req, res) => {
       return res.status(400).json({ message: "Invalid email" });
     }
 
-    let otp = generateOTP();
-    
-    // Test Account Bypass for Rajesh
-    if (email === "rajeshkayal8001@gmail.com") {
-      otp = "123456";
-    }
-
+    const otp = generateOTP();
     await saveOTP(email, otp);
 
-    // Skip sending email for test account to prevent SMTP block
-    if (email !== "rajeshkayal8001@gmail.com") {
-      const mailOptions = {
-        from: process.env.EMAIL_USER,
-        to: email,
-        subject: "FitCircle Pro - Login Verification Code",
-        html: getOTPEmailTemplate(otp),
-      };
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: "FitCircle Pro - Login Verification Code",
+      html: getOTPEmailTemplate(otp),
+    };
 
-      if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-        try {
-          await transporter.sendMail(mailOptions);
-        } catch (mailError) {
-          console.error("SMTP Error:", mailError);
-          // Return 200 anyway so the UI doesn't crash
-        }
-      } else {
-        console.log(`[DEV] OTP for ${email}: ${otp}`);
+    if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+      try {
+        await transporter.sendMail(mailOptions);
+      } catch (mailError) {
+        console.error("SMTP Error:", mailError);
       }
+    } else {
+      console.log(`[DEV] OTP for ${email}: ${otp}`);
     }
 
     res.json({ message: "OTP sent successfully" });
@@ -185,31 +175,24 @@ export const googleLogin = async (req, res) => {
     }
 
     // ── NEW: Instead of returning token, send OTP ──
-    let otp = generateOTP();
-
-    if (email === "rajeshkayal8001@gmail.com") {
-      otp = "123456";
-    }
-
+    const otp = generateOTP();
     await saveOTP(email, otp);
 
-    if (email !== "rajeshkayal8001@gmail.com") {
-      const mailOptions = {
-        from: process.env.EMAIL_USER,
-        to: email,
-        subject: "FitCircle Pro - Google Login Verification",
-        html: getOTPEmailTemplate(otp),
-      };
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: "FitCircle Pro - Google Login Verification",
+      html: getOTPEmailTemplate(otp),
+    };
 
-      if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-        try {
-          await transporter.sendMail(mailOptions);
-        } catch (mailError) {
-          console.error("SMTP Error:", mailError);
-        }
-      } else {
-        console.log(`[DEV] Google Login OTP for ${email}: ${otp}`);
+    if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+      try {
+        await transporter.sendMail(mailOptions);
+      } catch (mailError) {
+        console.error("SMTP Error:", mailError);
       }
+    } else {
+      console.log(`[DEV] Google Login OTP for ${email}: ${otp}`);
     }
 
     res.json({
