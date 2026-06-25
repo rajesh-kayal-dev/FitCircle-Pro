@@ -9,6 +9,7 @@ const app = express();
 const allowedOrigins = [
     "http://localhost:5173",
     "http://localhost:3000",
+    "https://fit-circle-pro.vercel.app",
     ...(process.env.CLIENT_URL ? [process.env.CLIENT_URL] : []),
 ];
 
